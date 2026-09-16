@@ -2,6 +2,17 @@
 
 remove backgrounds from images. locally. no uploads. no accounts. just vibes.
 
+<table>
+  <tr>
+    <td><strong>original</strong></td>
+    <td><strong>background removed</strong></td>
+  </tr>
+  <tr>
+    <td><img src="preview_original.jpg" width="400" /></td>
+    <td><img src="preview_no_bg.png" width="400" /></td>
+  </tr>
+</table>
+
 uses [bria rmbg v2.0](https://huggingface.co/briaai/RMBG-2.0) (birefnet) running on apple silicon mps.
 
 ## setup

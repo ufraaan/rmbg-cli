@@ -26,5 +26,4 @@ Thumbs.db
 .cache/
 
 # Outputs
-*_no_bg.png
 output/
