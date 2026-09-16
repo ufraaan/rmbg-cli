@@ -1,0 +1,15 @@
+#!/bin/bash
+# rmbg — wrapper that auto-activates the venv and runs remove_bg.py
+# Usage: rmbg photo.jpg [output.png] [-o DIR] [--open] [--overwrite] [--suffix SFX] [-q] [--device mps|cuda|cpu] [--formats]
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PYTHON="$SCRIPT_DIR/venv/bin/python"
+SCRIPT="$SCRIPT_DIR/remove_bg.py"
+
+if [ ! -f "$PYTHON" ]; then
+  echo "Error: venv not found at $SCRIPT_DIR/venv" >&2
+  echo "Run: python3 -m venv venv && source venv/bin/activate && pip install torch torchvision pillow kornia timm transformers huggingface_hub" >&2
+  exit 1
+fi
+
+exec "$PYTHON" "$SCRIPT" "$@"
