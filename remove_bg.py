@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
-"""Remove image backgrounds using BRIA RMBG v2.0 (BiRefNet).
+"""remove image backgrounds using BRIA RMBG v2.0 (BiRefNet). https://huggingface.co/briaai/RMBG-2.0
 
-Usage:
+usage:
     rmbg photo.jpg                    # → photo_no_bg.png (same folder)
     rmbg photo.jpg output.png         # → custom output path
     rmbg photo.jpg -o ~/Desktop/      # → redirect output folder
     rmbg photo.jpg --open             # → auto-open result in Preview
     rmbg photos/                      # → batch process folder
 
-Requires:
+requires:
     pip install torch torchvision pillow kornia timm transformers huggingface_hub
     huggingface-cli login  (RMBG 2.0 is a gated model)
 """
@@ -26,10 +26,6 @@ from PIL import Image
 from torchvision import transforms
 from transformers import AutoModelForImageSegmentation
 
-# ---------------------------------------------------------------------------
-# Constants
-# ---------------------------------------------------------------------------
-
 MODEL_ID = "briaai/RMBG-2.0"
 IMAGE_SIZE = (1024, 1024)
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".bmp", ".tiff", ".tif", ".heic"}
@@ -40,13 +36,10 @@ TRANSFORM_IMAGE = transforms.Compose([
     transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
 ])
 
-# ---------------------------------------------------------------------------
-# Hardware
-# ---------------------------------------------------------------------------
 
-
+# hardware
 def select_device(requested: str | None = None) -> torch.device:
-    """Resolve compute device. Explicit *requested* overrides auto-detect."""
+    """resolve compute device. explicit *requested* overrides auto-detect."""
     if requested:
         name = requested.lower()
         if name == "mps" and torch.backends.mps.is_available():
@@ -55,7 +48,7 @@ def select_device(requested: str | None = None) -> torch.device:
             return torch.device("cuda")
         if name == "cpu":
             return torch.device("cpu")
-        print(f"Warning: requested device '{requested}' unavailable, auto-detecting.")
+        print(f"warning: requested device '{requested}' unavailable, auto-detecting.")
 
     if torch.backends.mps.is_available():
         return torch.device("mps")
@@ -63,14 +56,9 @@ def select_device(requested: str | None = None) -> torch.device:
         return torch.device("cuda")
     return torch.device("cpu")
 
-
-# ---------------------------------------------------------------------------
-# Model
-# ---------------------------------------------------------------------------
-
-
+# model
 def load_model(device: torch.device) -> torch.nn.Module:
-    """Download (cached after first run) and load RMBG 2.0 onto *device*."""
+    """download (cached after first run) and load RMBG 2.0 onto *device*."""
     torch.set_float32_matmul_precision("high")
     model = AutoModelForImageSegmentation.from_pretrained(
         MODEL_ID,
@@ -79,18 +67,13 @@ def load_model(device: torch.device) -> torch.nn.Module:
     model.to(device).eval()
     return model
 
-
-# ---------------------------------------------------------------------------
-# Core pipeline
-# ---------------------------------------------------------------------------
-
-
+# core pipeline
 def predict_mask(
     model: torch.nn.Module,
     image: Image.Image,
     device: torch.device,
 ) -> Image.Image:
-    """Return an alpha-mask PIL image at the original resolution."""
+    """return an alpha-mask PIL image at the original resolution."""
     input_tensor = TRANSFORM_IMAGE(image).unsqueeze(0).to(device)
 
     with torch.no_grad():
@@ -102,17 +85,12 @@ def predict_mask(
 
 
 def apply_mask(image: Image.Image, mask: Image.Image) -> Image.Image:
-    """Composite *mask* as the alpha channel of *image* (returns RGBA)."""
+    """composite *mask* as the alpha channel of *image* (returns RGBA)."""
     rgba = image.convert("RGBA")
     rgba.putalpha(mask)
     return rgba
 
-
-# ---------------------------------------------------------------------------
-# Path resolution
-# ---------------------------------------------------------------------------
-
-
+# path resolution
 def resolve_output_path(
     input_path: Path,
     output_arg: Path | None,
@@ -120,7 +98,7 @@ def resolve_output_path(
     suffix: str,
     overwrite: bool,
 ) -> Path:
-    """Determine where to write the result PNG."""
+    """determine where to write the result PNG."""
     if overwrite:
         return input_path.with_suffix(".png")
     if output_arg:
@@ -130,7 +108,7 @@ def resolve_output_path(
 
 
 def resolve_image_paths(source: Path) -> list[Path]:
-    """Return image paths from a file or directory."""
+    """return image paths from a file or directory."""
     if source.is_file():
         return [source]
     if source.is_dir():
@@ -140,12 +118,7 @@ def resolve_image_paths(source: Path) -> list[Path]:
         )
     return []
 
-
-# ---------------------------------------------------------------------------
-# Processing
-# ---------------------------------------------------------------------------
-
-
+# process
 def process_single(
     input_path: Path,
     output_path: Path,
@@ -153,7 +126,7 @@ def process_single(
     device: torch.device,
     quiet: bool,
 ) -> float:
-    """Remove background from one image. Returns elapsed seconds."""
+    """remove background from one image. Returns elapsed seconds."""
     image = Image.open(input_path).convert("RGB")
     t0 = time.perf_counter()
     mask = predict_mask(model, image, device)
@@ -174,15 +147,15 @@ def process_batch(
     suffix: str,
     quiet: bool,
 ) -> None:
-    """Process every image in *source* (file or folder)."""
+    """process every image in *source* (file or folder)."""
     paths = resolve_image_paths(source)
     if not paths:
-        print(f"No images found in {source}")
+        print(f"no images found in {source}")
         sys.exit(1)
 
     total = len(paths)
     if not quiet:
-        print(f"Processing {total} image(s)…\n")
+        print(f"processing {total} image(s)…\n")
 
     for idx, img_path in enumerate(paths, 1):
         out = resolve_output_path(img_path, None, output_dir, suffix, False)
@@ -191,80 +164,75 @@ def process_batch(
             print(f"  [{idx}/{total}] {img_path.name} → {out.name}  ({elapsed:.1f}s)")
 
     if not quiet:
-        print(f"\nDone — {total} image(s) saved to {output_dir}")
+        print(f"\ndone — {total} image(s) saved to {output_dir}")
 
 
 def open_file(path: Path) -> None:
     """Open *path* with the default macOS application."""
     subprocess.run(["open", str(path)], check=False)
 
-
-# ---------------------------------------------------------------------------
-# CLI
-# ---------------------------------------------------------------------------
-
+# cli
 SUPPORTED_FORMATS = ", ".join(sorted(IMAGE_EXTENSIONS))
-
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="rmbg",
-        description="Remove image backgrounds with BRIA RMBG v2.0.",
-        epilog=f"Supported formats: {SUPPORTED_FORMATS}",
+        description="remove image backgrounds with BRIA RMBG v2.0.",
+        epilog=f"supported formats: {SUPPORTED_FORMATS}",
     )
     parser.add_argument(
         "source",
         nargs="?",
         type=Path,
         default=None,
-        help="Input image or folder.",
+        help="input image or folder.",
     )
     parser.add_argument(
         "output",
         nargs="?",
         type=Path,
         default=None,
-        help="Output path (single image) or output folder (batch).",
+        help="output path (single image) or output folder (batch).",
     )
     parser.add_argument(
         "-o", "--output-dir",
         type=Path,
         default=None,
         metavar="DIR",
-        help="Output directory (overrides default).",
+        help="output directory (overrides default).",
     )
     parser.add_argument(
         "--open",
         action="store_true",
         dest="auto_open",
-        help="Open result in Preview after processing.",
+        help="open result in Preview after processing.",
     )
     parser.add_argument(
         "--overwrite",
         action="store_true",
-        help="Replace the original file (converts to .png).",
+        help="replace the original file (converts to .png).",
     )
     parser.add_argument(
         "--suffix",
         default="_no_bg",
         metavar="SFX",
-        help="Suffix appended to filename (default: _no_bg).",
+        help="suffix appended to filename (default: _no_bg).",
     )
     parser.add_argument(
         "-q", "--quiet",
         action="store_true",
-        help="Suppress all output except errors.",
+        help="suppress all output except errors.",
     )
     parser.add_argument(
         "--device",
         choices=["mps", "cuda", "cpu"],
         default=None,
-        help="Force compute device (default: auto-detect).",
+        help="force compute device (default: auto-detect).",
     )
     parser.add_argument(
         "--formats",
         action="store_true",
-        help="Print supported formats and exit.",
+        help="print supported formats and exit.",
     )
     return parser
 
@@ -281,34 +249,34 @@ def main() -> None:
         parser.error("source is required (unless --formats is used)")
 
     if not args.source.exists():
-        print(f"Error: {args.source} does not exist.")
+        print(f"error: {args.source} does not exist.")
         sys.exit(1)
 
     device = select_device(args.device)
     if not args.quiet:
-        print(f"Device: {device.type.upper()}")
+        print(f"device: {device.type.upper()}")
 
     if not args.quiet:
-        print(f"Loading {MODEL_ID}…")
+        print(f"loading {MODEL_ID}…")
     model = load_model(device)
     if not args.quiet:
-        print("Model loaded.\n")
+        print("model loaded.\n")
 
-    # Single file with explicit output path
+    # single file with explicit output path
     if args.source.is_file() and args.output:
         elapsed = process_single(args.source, args.output, model, device, args.quiet)
         if not args.quiet:
-            print(f"Saved to {args.output} ({elapsed:.1f}s)")
+            print(f"saved to {args.output} ({elapsed:.1f}s)")
         if args.auto_open:
             open_file(args.output)
         return
 
-    # Single file, auto output name
+    # single file, auto output name
     if args.source.is_file():
         out = resolve_output_path(args.source, None, args.output_dir, args.suffix, args.overwrite)
         elapsed = process_single(args.source, out, model, device, args.quiet)
         if not args.quiet:
-            print(f"Saved to {out} ({elapsed:.1f}s)")
+            print(f"saved to {out} ({elapsed:.1f}s)")
         if args.auto_open:
             open_file(out)
         return
